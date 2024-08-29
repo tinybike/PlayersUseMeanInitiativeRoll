@@ -47,7 +47,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("LeftCombat", 2, "after", function (entity_guid, combat_guid)
-		local entity_uuid = Osi.GetUUID(entity_guid)
+        local entity_uuid = Osi.GetUUID(entity_guid)
         print("left combat", combat_guid, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
         if not left_combat_entity_uuids[combat_guid] then
             left_combat_entity_uuids[combat_guid] = {}
@@ -71,6 +71,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         party_initiative_rolls[combat_guid] = nil
         party_entities[combat_guid] = nil
         left_combat_entity_uuids[combat_guid] = nil
-		mean_initiative_roll[combat_guid] = nil
-	end)
+        mean_initiative_roll[combat_guid] = nil
+    end)
 end)
