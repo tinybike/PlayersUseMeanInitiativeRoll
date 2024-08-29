@@ -11,7 +11,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         print("Initiative roll:", initiative_roll, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
         if combat_guid ~= nil then
             if not party_initiative_rolls[combat_guid] then
-                print("combat guid not found in tables, making new", combat_guid)
+                -- print("combat guid not found in tables, making new", combat_guid)
                 party_initiative_rolls[combat_guid] = {}
                 party_entities[combat_guid] = {}
                 left_combat_entity_uuids[combat_guid] = {}
@@ -20,7 +20,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             if initiative_roll ~= -100 then
                 local is_player_or_ally = Osi.IsPlayer(entity_uuid) == 1 or Osi.IsAlly(entity_uuid, GetHostCharacter()) == 1
                 if not is_player_or_ally and initiative_roll == mean_initiative_roll[combat_guid] then
-                    adjusted_initiative_roll = math.random() > 0.5 and initiative_roll + 1 or initiative_roll - 1
+                    local adjusted_initiative_roll = math.random() > 0.5 and initiative_roll + 1 or initiative_roll - 1
                     print("enemy might split group, bumping roll by 1", initiative_roll, adjusted_initiative_roll)
                     entity.CombatParticipant.InitiativeRoll = adjusted_initiative_roll
                     entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = adjusted_initiative_roll
@@ -39,8 +39,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                         entity:Replicate("CombatParticipant")
                     end
                     print("mean initiative roll:", mean_initiative_roll[combat_guid], sum)
-                    _D(party_initiative_rolls)
-                    _D(mean_initiative_roll)
+                    -- _D(party_initiative_rolls)
+                    -- _D(mean_initiative_roll)
                 end
             end
         end
@@ -48,7 +48,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("LeftCombat", 2, "after", function (entity_guid, combat_guid)
         local entity_uuid = Osi.GetUUID(entity_guid)
-        print("left combat", combat_guid, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
+        -- print("left combat", combat_guid, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
         if not left_combat_entity_uuids[combat_guid] then
             left_combat_entity_uuids[combat_guid] = {}
         end
@@ -56,18 +56,18 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
     
     Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function (combat_guid)
-        print("******************************************************")
-        print("******************************************************")
-        print("******************************************************")
-        print("******************************************************")
-        print("*****************combat ended*************************")
-        print("******************************************************")
-        print("******************************************************")
-        print("******************************************************")
-        print("******************************************************")
-        _D(party_initiative_rolls[combat_guid])
-        _D(mean_initiative_roll)
-        _D(left_combat_entity_uuids)
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- print("*****************combat ended*************************")
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- print("******************************************************")
+        -- _D(party_initiative_rolls[combat_guid])
+        -- _D(mean_initiative_roll)
+        -- _D(left_combat_entity_uuids)
         party_initiative_rolls[combat_guid] = nil
         party_entities[combat_guid] = nil
         left_combat_entity_uuids[combat_guid] = nil
