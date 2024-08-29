@@ -8,7 +8,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         local entity_uuid = entity.Uuid.EntityUuid
         local combat_guid = Osi.CombatGetGuidFor(entity_uuid)
         local initiative_roll = entity.CombatParticipant.InitiativeRoll
-        print("Initiative roll:", initiative_roll, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
+        -- print("Initiative roll:", initiative_roll, entity_uuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entity_uuid)))
         if combat_guid ~= nil then
             if not party_initiative_rolls[combat_guid] then
                 -- print("combat guid not found in tables, making new", combat_guid)
