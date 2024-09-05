@@ -36,7 +36,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                         -- print("All party members accounted for, averaging initiative rolls...")
                         -- _D(partyInitiativeRolls)
                         local totalInitiativeRoll = 0
-                        local totalInitiativeRoll = 0
                         for _, partyMemberInitiativeRoll in pairs(partyInitiativeRolls[combatGuid]) do
                             totalInitiativeRoll = totalInitiativeRoll + partyMemberInitiativeRoll
                         end 
