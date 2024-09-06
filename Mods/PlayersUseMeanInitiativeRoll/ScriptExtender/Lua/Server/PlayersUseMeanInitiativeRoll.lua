@@ -20,7 +20,7 @@ local function debugDump(...)
 end
 
 local function calculateMeanInitiativeRoll(combatGuid)
-    print("Calculating mean")
+    debugPrint("Calculating mean")
     local totalInitiativeRoll = 0
     local numInitiativeRolls = 0
     for _, partyEntity in pairs(partyEntities[combatGuid]) do
@@ -162,7 +162,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                     end
                 else
                     local isEnemyOrNeutral = Osi.IsEnemy(entityUuid, GetHostCharacter()) == 1 or Osi.IsNeutral(entityUuid, GetHostCharacter()) == 1
-                    print(Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+                    debugPrint(Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
                     debugPrint("isEnemyOrNeutral:", entityUuid, isEnemyOrNeutral)
                     if isEnemyOrNeutral then
                         if initiativeRoll ~= -20 and enemyEntities[combatGuid][entityUuid] == nil then
