@@ -4,7 +4,6 @@ local meanInitiativeRoll = {}
 local numPartyMembersInCombat = {}
 local numPartyMembersAccountedFor = {}
 local firstCombatParticipantUuid = {}
-local forcedRefresh = {}
 local refresherBoneTemplateId = "876c66a6-018c-48fe-8406-d90561d3db23"
 
 local function calculateMeanInitiativeRoll(combatGuid)
@@ -65,7 +64,6 @@ local function replicatePartyCombatParticipants(combatGuid)
             partyEntity.entity:Replicate("CombatParticipant")
         end
     end
-    forceRefresh(combatGuid)
 end
 
 local function bumpEnemyInitiativeRoll(enemyEntity)
@@ -143,7 +141,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                 else
                     local isEnemyOrNeutral = Osi.IsEnemy(entityUuid, GetHostCharacter()) == 1 or Osi.IsNeutral(entityUuid, GetHostCharacter()) == 1
                     print(Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
-                    -- print("isEnemyOrNeutral:", entityUuid, isEnemyOrNeutral)
+                    print("isEnemyOrNeutral:", entityUuid, isEnemyOrNeutral)
                     if isEnemyOrNeutral then
                         if initiativeRoll ~= -20 and enemyEntities[combatGuid][entityUuid] == nil then
                             enemyEntities[combatGuid][entityUuid] = {
@@ -166,14 +164,10 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             end
         end
     end)
-    -- Ext.Osiris.RegisterListener("CombatStarted", 1, "before", function (combatGuid)
-    --     print("combat started", combatGuid)
-    --     forceRefresh(combatGuid)
-    -- end)
-    -- Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", function (combatGuid, round)
-    --     print("combat round started", combatGuid, round)
-    --     -- forceRefresh(combatGuid)
-    -- end)
+    Ext.Osiris.RegisterListener("CombatStarted", 1, "before", function (combatGuid)
+        print("combat started", combatGuid)
+        forceRefresh(combatGuid)
+    end)
     Ext.Osiris.RegisterListener("LeftCombat", 2, "after", function (entityGuid, combatGuid)
         print("Left combat", combatGuid, entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
@@ -182,17 +176,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             partyEntities[combatGuid][entityUuid].hasLeftCombat = true
         end
     end)
-    -- Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (target)
-    --     print("GainedControl", target)
-    --     local targetUuid = Osi.GetUUID(target)
-    --     local combatGuid = Osi.CombatGetGuidFor(targetUuid)
-    --     print(targetUuid, combatGuid)
-    --     _D(partyEntities[combatGuid])
-    --     if combatGuid ~= nil and partyEntities[combatGuid] ~= nil and partyEntities[combatGuid][targetUuid] ~= nil and forcedRefresh[combatGuid] == nil then
-    --         forceRefresh(combatGuid)
-    --         forcedRefresh[combatGuid] = true
-    --     end
-    -- end)
     Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function (combatGuid)
         print("Combat ended", combatGuid)
         partyEntities[combatGuid] = nil
@@ -201,6 +184,5 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         numPartyMembersInCombat[combatGuid] = nil
         numPartyMembersAccountedFor[combatGuid] = nil
         firstCombatParticipantUuid[combatGuid] = nil
-        forcedRefresh[combatGuid] = nil
     end)
 end)
