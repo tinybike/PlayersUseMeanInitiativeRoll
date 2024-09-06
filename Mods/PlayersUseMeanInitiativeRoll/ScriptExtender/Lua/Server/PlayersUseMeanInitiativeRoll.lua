@@ -1,74 +1,206 @@
-local partyInitiativeRolls = {}
 local partyEntities = {}
+local enemyEntities = {}
 local meanInitiativeRoll = {}
 local numPartyMembersInCombat = {}
 local numPartyMembersAccountedFor = {}
+local firstCombatParticipantUuid = {}
+local forcedRefresh = {}
+local refresherBoneTemplateId = "876c66a6-018c-48fe-8406-d90561d3db23"
+
+local function calculateMeanInitiativeRoll(combatGuid)
+    print("Calculating mean")
+    local totalInitiativeRoll = 0
+    local numInitiativeRolls = 0
+    for _, partyEntity in pairs(partyEntities[combatGuid]) do
+        _D(partyEntity)
+        if partyEntity.originalInitiativeRoll ~= nil and partyEntity.hasLeftCombat == false then
+            totalInitiativeRoll = totalInitiativeRoll + partyEntity.originalInitiativeRoll
+            numInitiativeRolls = numInitiativeRolls + 1
+        end
+    end
+    local meanInitiativeRoll = math.floor(totalInitiativeRoll / numInitiativeRolls + 0.5)
+    print("Mean initiative roll:", meanInitiativeRoll)
+    return meanInitiativeRoll
+end
+
+local function setPartyInitiativeRollToMean(combatGuid)
+    for _, partyEntity in pairs(partyEntities[combatGuid]) do
+        print("setting initiative roll for party entity")
+        _D(partyEntity)
+        if partyEntity.entity ~= nil and partyEntity.hasLeftCombat == false then
+            local entity = partyEntity.entity
+            entity.CombatParticipant.InitiativeRoll = meanInitiativeRoll[combatGuid]
+            entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = meanInitiativeRoll[combatGuid]
+            entity:Replicate("CombatParticipant")
+            partyEntity.initiativeRoll = meanInitiativeRoll[combatGuid]
+            print("Updated initiative roll for party entity to", entity.CombatParticipant.InitiativeRoll)
+            _D(partyEntity)
+        end
+    end
+end
+
+local function forceRefresh(combatGuid)
+    if firstCombatParticipantUuid[combatGuid] ~= nil then
+        local x, y, z = Osi.GetPosition(firstCombatParticipantUuid[combatGuid])
+        local forceRefresherUuid = Osi.CreateAt(refresherBoneTemplateId, x, y, z, 0, 0, "")
+        print("Force refresher uuid", forceRefresherUuid)
+        local forceRefresherEntity = Ext.Entity.Get(forceRefresherUuid)
+        --_D(forceRefresherEntity:GetAllComponents())
+        forceRefresherEntity.GameObjectVisual.Scale = 0.0
+        forceRefresherEntity:Replicate("GameObjectVisual")
+        Ext.Timer.WaitFor(1000, function ()
+            Osi.EnterCombat(forceRefresherUuid, firstCombatParticipantUuid[combatGuid])
+            Ext.Timer.WaitFor(1000, function ()
+                Osi.RequestDelete(forceRefresherUuid)
+            end)
+        end)
+    end
+end
+
+local function replicatePartyCombatParticipants(combatGuid)
+    for _, partyEntity in pairs(partyEntities[combatGuid]) do
+        if partyEntity.entity ~= nil then
+            print("Replicate")
+            _D(partyEntity)
+            partyEntity.entity:Replicate("CombatParticipant")
+        end
+    end
+    forceRefresh(combatGuid)
+end
+
+local function bumpEnemyInitiativeRoll(enemyEntity)
+    local entity = enemyEntity.entity
+    local bumpedInitiativeRoll = math.random() > 0.5 and enemyEntity.originalInitiativeRoll + 1 or enemyEntity.originalInitiativeRoll - 1
+    local enemyDisplayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entity.Uuid.EntityUuid))
+    print("Enemy", enemyDisplayName, "might split group, bumping roll from", enemyEntity.originalInitiativeRoll, "to", bumpedInitiativeRoll)
+    entity.CombatParticipant.InitiativeRoll = bumpedInitiativeRoll
+    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = bumpedInitiativeRoll
+    entity:Replicate("CombatParticipant")
+    enemyEntity.initiativeRoll = bumpedInitiativeRoll
+    _D(enemyEntity)
+end
+
+local function bumpEnemyInitiativeRolls(combatGuid)
+    print("Updating enemy entities initiative rolls if needed...")
+    for _, enemyEntity in pairs(enemyEntities[combatGuid]) do
+        if enemyEntity.originalInitiativeRoll == meanInitiativeRoll[combatGuid] then
+            bumpEnemyInitiativeRoll(enemyEntity)
+        end
+    end
+end
+
+local function onFirstCombatParticipant(combatGuid)
+    partyEntities[combatGuid] = {}
+    enemyEntities[combatGuid] = {}
+    meanInitiativeRoll[combatGuid] = nil
+    numPartyMembersInCombat[combatGuid] = Osi.CombatGetInvolvedPartyMembersCount(combatGuid)
+    print("Num party members in combat:", numPartyMembersInCombat[combatGuid], combatGuid)
+    for _, player in pairs(Osi.DB_Players:Get(nil)) do
+        combatParticipantUuid = Osi.GetUUID(player[1])
+        if firstCombatParticipantUuid[combatGuid] == nil then
+            firstCombatParticipantUuid[combatGuid] = combatParticipantUuid
+        end
+        partyEntities[combatGuid][combatParticipantUuid] = {}
+    end
+    print("Party entities for combat", combatGuid)
+    _D(partyEntities)
+    numPartyMembersAccountedFor[combatGuid] = 0
+end
 
 Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Entity.Subscribe("CombatParticipant", function (entity, _, _)
         local entityUuid = entity.Uuid.EntityUuid
         local combatGuid = Osi.CombatGetGuidFor(entityUuid)
         if combatGuid ~= nil then
-            if not partyInitiativeRolls[combatGuid] then
-                partyInitiativeRolls[combatGuid] = {}
-                partyEntities[combatGuid] = {}
-                meanInitiativeRoll[combatGuid] = nil
-                numPartyMembersInCombat[combatGuid] = Osi.CombatGetInvolvedPartyMembersCount(combatGuid)
-                -- print("Num party members in combat:", numPartyMembersInCombat[combatGuid], combatGuid)
-                for i = 1, numPartyMembersInCombat[combatGuid] do
-                    partyInitiativeRolls[combatGuid][Osi.GetUUID(Osi.CombatGetInvolvedPartyMember(combatGuid, i))] = nil
-                end
-                numPartyMembersAccountedFor[combatGuid] = 0
+            if not partyEntities[combatGuid] then
+                onFirstCombatParticipant(combatGuid)
             end
             local initiativeRoll = entity.CombatParticipant.InitiativeRoll
-            if initiativeRoll ~= -100 and numPartyMembersInCombat[combatGuid] > 0 then
-                local isPlayerOrAlly = Osi.IsPlayer(entityUuid) == 1 or Osi.IsAlly(entityUuid, GetHostCharacter()) == 1
-                -- print("Initiative roll:", initiativeRoll, entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
-                if isPlayerOrAlly then
-                    if partyInitiativeRolls[combatGuid][entityUuid] == nil then
-                        table.insert(partyEntities[combatGuid], entity)
-                        partyInitiativeRolls[combatGuid][entityUuid] = initiativeRoll
+            if initiativeRoll ~= -100 then
+                print("Initiative roll:", initiativeRoll, entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+                if partyEntities[combatGuid][entityUuid] then
+                    if partyEntities[combatGuid][entityUuid].entity == nil then
+                        partyEntities[combatGuid][entityUuid] = {
+                            uuid=entityUuid,
+                            displayName=Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)),
+                            entity=entity,
+                            initiativeRoll=initiativeRoll,
+                            originalInitiativeRoll=initiativeRoll,
+                            hasLeftCombat=false
+                        }
                         numPartyMembersAccountedFor[combatGuid] = numPartyMembersAccountedFor[combatGuid] + 1
-                        -- print("Accounted for", numPartyMembersAccountedFor[combatGuid], "out of", numPartyMembersInCombat[combatGuid], "total")
-                        -- _D(partyInitiativeRolls)
-                    end
-                    if meanInitiativeRoll[combatGuid] == nil and numPartyMembersAccountedFor[combatGuid] == numPartyMembersInCombat[combatGuid] then
-                        -- print("All party members accounted for, averaging initiative rolls...")
-                        -- _D(partyInitiativeRolls)
-                        local totalInitiativeRoll = 0
-                        for _, partyMemberInitiativeRoll in pairs(partyInitiativeRolls[combatGuid]) do
-                            totalInitiativeRoll = totalInitiativeRoll + partyMemberInitiativeRoll
-                        end 
-                        meanInitiativeRoll[combatGuid] = math.floor(totalInitiativeRoll / numPartyMembersInCombat[combatGuid] + 0.5)
-                        for _, partyEntity in ipairs(partyEntities[combatGuid]) do
-                            partyEntity.CombatParticipant.InitiativeRoll = meanInitiativeRoll[combatGuid]
-                            partyEntity.CombatParticipant.CombatHandle.CombatState.Initiatives[partyEntity] = meanInitiativeRoll[combatGuid]
-                            partyEntity:Replicate("CombatParticipant")
+                        print("Accounted for", numPartyMembersAccountedFor[combatGuid], "party members")
+                        _D(partyEntities)
+                        if numPartyMembersAccountedFor[combatGuid] > 1 then
+                            print("Got more than 1 party members, calculating mean...")
+                            meanInitiativeRoll[combatGuid] = calculateMeanInitiativeRoll(combatGuid)
+                            setPartyInitiativeRollToMean(combatGuid)
+                            _D(meanInitiativeRoll)
+                            bumpEnemyInitiativeRolls(combatGuid)
+                            replicatePartyCombatParticipants(combatGuid)
                         end
-                        -- _D(meanInitiativeRoll)
                     end
                 else
-                    if meanInitiativeRoll[combatGuid] ~= nil and initiativeRoll == meanInitiativeRoll[combatGuid] then
-                        -- print("Enemy initiative roll:", initiativeRoll, entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
-                        local adjustedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
-                        -- print("Enemy might split group, bumping roll to", adjustedInitiativeRoll)
-                        entity.CombatParticipant.InitiativeRoll = adjustedInitiativeRoll
-                        entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = adjustedInitiativeRoll
-                        entity:Replicate("CombatParticipant")
-                        for _, partyEntity in ipairs(partyEntities[combatGuid]) do
-                            partyEntity:Replicate("CombatParticipant")
+                    local isEnemyOrNeutral = Osi.IsEnemy(entityUuid, GetHostCharacter()) == 1 or Osi.IsNeutral(entityUuid, GetHostCharacter()) == 1
+                    print(Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+                    -- print("isEnemyOrNeutral:", entityUuid, isEnemyOrNeutral)
+                    if isEnemyOrNeutral then
+                        if initiativeRoll ~= -20 and enemyEntities[combatGuid][entityUuid] == nil then
+                            enemyEntities[combatGuid][entityUuid] = {
+                                uuid=entityUuid,
+                                displayName=Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)),
+                                entity=entity,
+                                initiativeRoll=initiativeRoll,
+                                originalInitiativeRoll=initiativeRoll
+                            }
+                            print("Enemy/neutral entities:")
+                            _D(enemyEntities)
+                        end
+                        if meanInitiativeRoll[combatGuid] ~= nil and initiativeRoll == meanInitiativeRoll[combatGuid] then
+                            print("Bumpable enemy initiative roll:", initiativeRoll, entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+                            bumpEnemyInitiativeRoll(enemyEntities[combatGuid][entityUuid])
+                            replicatePartyCombatParticipants(combatGuid)
                         end
                     end
                 end
             end
         end
     end)
+    -- Ext.Osiris.RegisterListener("CombatStarted", 1, "before", function (combatGuid)
+    --     print("combat started", combatGuid)
+    --     forceRefresh(combatGuid)
+    -- end)
+    -- Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", function (combatGuid, round)
+    --     print("combat round started", combatGuid, round)
+    --     -- forceRefresh(combatGuid)
+    -- end)
+    Ext.Osiris.RegisterListener("LeftCombat", 2, "after", function (entityGuid, combatGuid)
+        print("Left combat", combatGuid, entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid ~= nil and partyEntities[combatGuid][entityUuid] ~= nil then
+            print(entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+            partyEntities[combatGuid][entityUuid].hasLeftCombat = true
+        end
+    end)
+    -- Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (target)
+    --     print("GainedControl", target)
+    --     local targetUuid = Osi.GetUUID(target)
+    --     local combatGuid = Osi.CombatGetGuidFor(targetUuid)
+    --     print(targetUuid, combatGuid)
+    --     _D(partyEntities[combatGuid])
+    --     if combatGuid ~= nil and partyEntities[combatGuid] ~= nil and partyEntities[combatGuid][targetUuid] ~= nil and forcedRefresh[combatGuid] == nil then
+    --         forceRefresh(combatGuid)
+    --         forcedRefresh[combatGuid] = true
+    --     end
+    -- end)
     Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function (combatGuid)
-        -- print("Combat ended", combatGuid)
-        partyInitiativeRolls[combatGuid] = nil
+        print("Combat ended", combatGuid)
         partyEntities[combatGuid] = nil
+        enemyEntities[combatGuid] = nil
         meanInitiativeRoll[combatGuid] = nil
         numPartyMembersInCombat[combatGuid] = nil
         numPartyMembersAccountedFor[combatGuid] = nil
+        firstCombatParticipantUuid[combatGuid] = nil
+        forcedRefresh[combatGuid] = nil
     end)
 end)
