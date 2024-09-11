@@ -189,7 +189,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("EnteredCombat", 2, "before", function (entityGuid, combatGuid)
         debugPrint("Entered combat", combatGuid, entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        if entityUuid ~= nil and partyEntities[combatGuid][entityUuid] ~= nil then
+        if entityUuid ~= nil and partyEntities[combatGuid] ~= nil and partyEntities[combatGuid][entityUuid] ~= nil then
             debugDump(partyEntities)
             if partyEntities[combatGuid][entityUuid].hasLeftCombat == true then
                 partyEntities[combatGuid][entityUuid].hasLeftCombat = false
