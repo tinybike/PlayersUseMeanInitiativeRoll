@@ -194,11 +194,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             if partyEntities[combatGuid][entityUuid].hasLeftCombat == true then
                 partyEntities[combatGuid][entityUuid].hasLeftCombat = false
                 partyEntities[combatGuid][entityUuid].initiativeRoll = partyEntities[combatGuid][entityUuid].originalInitiativeRoll
-                if partyEntities[combatGuid][entityUuid].initiativeRoll ~= meanInitiativeRoll[combatGuid] then
-                    debugPrint("Adjusted re-entered combat participant, setting initiative roll to mean again...")
-                    setPartyInitiativeRollToMean(combatGuid)
-                    bumpEnemyInitiativeRolls(combatGuid)
-                end
+                setPartyInitiativeRollToMean(combatGuid)
+                bumpEnemyInitiativeRolls(combatGuid)
                 replicatePartyCombatParticipants(combatGuid)
                 debugPrint("Restored initiative roll for", entityUuid)
                 debugDump(partyEntities)
